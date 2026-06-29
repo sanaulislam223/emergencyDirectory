@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bharat Emergency Directory & Live Tracker</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cloudflare.com">
+</head>
+<body>
+
+    <!-- मुख्य हेडर -->
+    <header class="app-header">
+        <div class="logo">
+            <i class="fa-solid fa-map-location-dot animate-pulse"></i>
+            <h1>Kavach: All-India Emergency</h1>
+        </div>
+        <!-- 🔌 लोकेशन ऑन/ऑफ स्विच -->
+        <div class="gps-switch-container">
+            <span>GPS ट्रैकिंग:</span>
+            <label class="switch">
+                <input type="checkbox" id="gpsToggle" checked onchange="toggleGPS()">
+                <span class="slider round"></span>
+            </label>
+        </div>
+    </header>
+
+    <main class="container">
+        
+        <!-- 📍 आपकी लाइव माइक्रो-लोकेशन (गांव, जिला, पिनकोड) -->
+        <section class="live-info-box" id="infoBox">
+            <div class="info-header">
+                <i class="fa-solid fa-house-medical-flag"></i>
+                <h3>आपकी वर्तमान स्थिति (Live Micro-Location)</h3>
+            </div>
+            <div class="location-grid">
+                <div class="loc-item"><strong>राज्य:</strong> <span id="stateName">ढूंढ रहे हैं...</span></div>
+                <div class="loc-item"><strong>जिला:</strong> <span id="districtName">ढूंढ रहे हैं...</span></div>
+                <div class="loc-item"><strong>गांव/कस्बा:</strong> <span id="villageName">ढूंढ रहे हैं...</span></div>
+                <div class="loc-item"><strong>पिन कोड:</strong> <span id="pinCode">------</span></div>
+            </div>
+            <div class="help-source">
+                <i class="fa-solid fa-bullseye"></i> <strong>निकटतम रिस्पॉन्स सेंटर:</strong> <span id="nearestHub">गणना की जा रही है...</span>
+            </div>
+        </section>
+
+        <!-- 🔴 आपातकालीन SOS बटन -->
+        <section class="sos-section">
+            <button class="sos-btn" onclick="triggerSOS()">
+                <span class="sos-text">SOS</span>
+                <span class="sos-subtext">TAP FOR IMMEDIATE HELP</span>
+            </button>
+        </section>
+
+        <!-- 🔍 सर्च बार -->
+        <section class="search-section">
+            <div class="search-box">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="searchInput" placeholder="अस्पताल, थाना, ब्लड बैंक या सेवा खोजें..." onkeyup="filterData()">
+            </div>
+        </section>
+
+        <!-- 🗂️ सभी 6 महत्वपूर्ण केटेगरी ग्रिड -->
+        <section class="category-grid">
+            <div class="cat-card medical" id="cat-Medical" onclick="filterByCategory('Medical')">
+                <i class="fa-solid fa-hand-holding-medical"></i>
+                <span>मेडिकल</span>
+            </div>
+            <div class="cat-card police" id="cat-Police" onclick="filterByCategory('Police')">
+                <i class="fa-solid fa-shield-cat"></i>
+                <span>पुलिस</span>
+            </div>
+            <div class="cat-card women" id="cat-Women" onclick="filterByCategory('Women')">
+                <i class="fa-solid fa-person-shelter"></i>
+                <span>महिला/बाल</span>
+            </div>
+            <div class="cat-card disaster" id="cat-Disaster" onclick="filterByCategory('Disaster')">
+                <i class="fa-solid fa-cloud-showers-heavy"></i>
+                <span>आपदा</span>
+            </div>
+            <div class="cat-card cyber" id="cat-Cyber" onclick="filterByCategory('Cyber')">
+                <i class="fa-solid fa-user-secret"></i>
+                <span>साइबर क्राइम</span>
+            </div>
+            <div class="cat-card blood" id="cat-Blood" onclick="filterByCategory('Blood')">
+                <i class="fa-solid fa-droplet"></i>
+                <span>ब्लड बैंक</span>
+            </div>
+        </section>
+
+        <!-- 📋 डायरेक्टरी लिस्टिंग -->
+        <section class="directory-section">
+            <h2 id="directoryTitle">आपातकालीन सेवाएं (दूरी के क्रमानुसार)</h2>
+            <div id="directoryList" class="directory-list"></div>
+        </section>
+
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
