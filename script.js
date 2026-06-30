@@ -24,42 +24,93 @@ function toggleGPS() {
     }
 }
 
-// 📍 ब्राउज़र का अपना सुरक्षित इन-बिल्ट ट्रैकर (यह बिना बाहरी API के सीधे काम करता है)
+// 📍 हाइब्रिड लाइव ट्रैकर (जीपीएस फेल होने पर यह तुरंत इंटरनेट नेटवर्क चालू कर देगा)
 function trackLiveLocation() {
     if (!isGPSEnabled) return;
 
     if (!navigator.geolocation) {
-        resetLocationUI("सपोर्ट नहीं है", "जीपीएस अनुपलब्ध", "लोकल मोड सक्रिय", "------");
-        loadDirectory();
+        fetchIPLocation(); // जीपीएस न होने पर सीधे इंटरनेट नेटवर्क से खोजें
         return;
     }
 
+    // जीपीएस रिस्पॉन्स के लिए केवल 3 सेकंड का समय दें, अन्यथा तुरंत नेटवर्क सर्च चालू करें
+    const geoOptions = {
+        enableHighAccuracy: true, 
+        timeout: 3000,           
+        maximumAge: 0
+    };
+
     navigator.geolocation.getCurrentPosition(
-        (position) => {
+        async (position) => {
             userLat = position.coords.latitude;
             userLon = position.coords.longitude;
-
-            // बाहरी API के ब्लॉक होने पर भी यूज़र को सीधे उसके अक्षांश/देशांतर दिखाकर आश्वस्त करें
-            resetLocationUI(
-                "सक्रिय (Live)",
-                `अक्षांश: ${userLat.toFixed(3)}`,
-                `देशांतर: ${userLon.toFixed(3)}`,
-                "ऑटो-डिटेक्ट"
-            );
-
-            document.getElementById("locationStatus").innerHTML = `<i class="fa-solid fa-circle-check"></i> GPS सक्रिय`;
-            document.getElementById("locationStatus").className = "live-location-badge success";
-            document.getElementById("directoryTitle").innerText = "आपके वर्तमान स्थान की लाइव सेवाएं";
-            loadDirectory();
+            fetchAddressFromCoords(userLat, userLon);
         },
         (error) => {
-            console.log("GPS Denied or Timeout");
-            resetLocationUI("अनुमति लंबित", "कृपया GPS ऑन करें", "अनुमति दें", "------");
-            loadDirectory();
-        },
-        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+            console.log("GPS Blocked/Timeout. Fetching via Internet Network...");
+            fetchIPLocation(); // यदि आपके लैपटॉप का जीपीएस बंद है, तो यह बिना एरर के सीधे नेटवर्क से ढूंढेगा
+        }, 
+        geoOptions
     );
 }
+
+// 🌐 लाइव इंटरनेट नेटवर्क ट्रैकर (यह बिना जीपीएस के भी आपका सही एरिया तुरंत निकाल देगा)
+async function fetchIPLocation() {
+    try {
+        const response = await fetch('https://ipapi.co');
+        const data = await response.json();
+        
+        userLat = data.latitude;
+        userLon = data.longitude;
+
+        // यह आपके इंटरनेट नेटवर्क के अनुसार लाइव नाम सेट करेगा (जैसे मऊ या नागपुर)
+        resetLocationUI(
+            data.region || "उत्तर प्रदेश",
+            data.city || "मऊ जिला",
+            "स्थानीय क्षेत्र",
+            data.postal || "275102"
+        );
+
+        document.getElementById("locationStatus").innerHTML = `<i class="fa-solid fa-network-wired"></i> नेटवर्क एक्टिव`;
+        document.getElementById("locationStatus").className = "live-location-badge success";
+        document.getElementById("directoryTitle").innerText = `आपातकालीन सेवाएं: ${data.city || 'आपके क्षेत्र'} के पास`;
+        
+        loadDirectory();
+        } catch (e) {
+        console.error("Network Fetch Failed", e);
+        // 🚀 फिक्स 1: यहाँ से मऊ और अदरी का नाम हमेशा के लिए हटा दिया गया है
+        resetLocationUI("भारत का राज्य", "आपका जिला", "स्थानीय क्षेत्र", "ऑटो-डिटेक्ट");
+        loadDirectory();
+    }
+}
+
+// जीपीएस कोऑर्डिनेट्स से बिल्कुल लाइव नाम (OpenStreetMap API) निकालने का फंक्शन
+async function fetchAddressFromCoords(lat, lon) {
+    try {
+        const response = await fetch(`https://openstreetmap.org{lat}&lon=${lon}&addressdetails=1&accept-language=hi`);
+        const data = await response.json();
+        
+        if (data.address) {
+            const addr = data.address;
+            
+            // 🚀 फिक्स 2: पूरी तरह क्लीन और 100% ऑल-इंडिया डायनेमिक वैरियेबल्स
+            const state = addr.state || "भारत का राज्य";
+            const district = addr.district || addr.county || addr.state_district || "आपका जिला";
+            const village = addr.village || addr.town || addr.suburb || addr.neighbourhood || addr.city || "स्थानीय क्षेत्र";
+            const pincode = addr.postcode || "ऑटो-डिटेक्ट";
+
+            resetLocationUI(state, district, village, pincode);
+            
+            document.getElementById("locationStatus").innerHTML = `<i class="fa-solid fa-circle-check"></i> GPS एक्टिव`;
+            document.getElementById("locationStatus").className = "live-location-badge success";
+            document.getElementById("directoryTitle").innerText = `आपातकालीन सेवाएं: ${village}, ${district} के लिए`;
+        }
+    } catch (error) {
+        fetchIPLocation();
+    }
+    loadDirectory();
+}
+
 
 function resetLocationUI(state, district, village, pin) {
     document.getElementById("stateName").innerText = state;
@@ -75,8 +126,6 @@ function loadDirectory() {
 
     if (userLat) {
         document.getElementById("nearestHub").innerHTML = `<i class="fa-solid fa-bolt"></i> लाइव सैटेलाइट ट्रैकर सक्रिय है। नीचे बटनों का उपयोग करें।`;
-    } else {
-        document.getElementById("nearestHub").innerHTML = `<i class="fa-solid fa-circle-info"></i> कृपया ऊपर ब्राउज़र में लोकेशन अनुमति (Allow) दें।`;
     }
 
     const filtered = nationalHelplines.filter(item => {
@@ -101,7 +150,6 @@ function loadDirectory() {
         listContainer.appendChild(card);
     });
 
-    // 🚀 अचूक डायनेमिक गूगल मैप्स पैरामीटर्स (यह नागपुर में नागपुर का और मऊ में मऊ का डेटा लाइव दिखाएगा)
     if (userLat) {
         const dynamicMapCards = document.createElement('div');
         dynamicMapCards.innerHTML = `
