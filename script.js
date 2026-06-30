@@ -24,79 +24,42 @@ function toggleGPS() {
     }
 }
 
+// 📍 ब्राउज़र का अपना सुरक्षित इन-बिल्ट ट्रैकर (यह बिना बाहरी API के सीधे काम करता है)
 function trackLiveLocation() {
     if (!isGPSEnabled) return;
+
     if (!navigator.geolocation) {
-        fetchIPLocation(); 
+        resetLocationUI("सपोर्ट नहीं है", "जीपीएस अनुपलब्ध", "लोकल मोड सक्रिय", "------");
+        loadDirectory();
         return;
     }
-    const geoOptions = { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 };
+
     navigator.geolocation.getCurrentPosition(
-        async (position) => {
+        (position) => {
             userLat = position.coords.latitude;
             userLon = position.coords.longitude;
-            fetchAddressFromCoords(userLat, userLon);
+
+            // बाहरी API के ब्लॉक होने पर भी यूज़र को सीधे उसके अक्षांश/देशांतर दिखाकर आश्वस्त करें
+            resetLocationUI(
+                "सक्रिय (Live)",
+                `अक्षांश: ${userLat.toFixed(3)}`,
+                `देशांतर: ${userLon.toFixed(3)}`,
+                "ऑटो-डिटेक्ट"
+            );
+
+            document.getElementById("locationStatus").innerHTML = `<i class="fa-solid fa-circle-check"></i> GPS सक्रिय`;
+            document.getElementById("locationStatus").className = "live-location-badge success";
+            document.getElementById("directoryTitle").innerText = "आपके वर्तमान स्थान की लाइव सेवाएं";
+            loadDirectory();
         },
-        (error) => { fetchIPLocation(); }, 
-        geoOptions
+        (error) => {
+            console.log("GPS Denied or Timeout");
+            resetLocationUI("अनुमति लंबित", "कृपया GPS ऑन करें", "अनुमति दें", "------");
+            loadDirectory();
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
 }
-
-// 🌐 1. fetchIPLocation फंक्शन (लाइन 44 से 58 तक) को इससे बदलें:
-async function fetchIPLocation() {
-    try {
-        const response = await fetch('https://ipapi.co');
-        const data = await response.json();
-        
-        userLat = data.latitude;
-        userLon = data.longitude;
-
-        resetLocationUI(
-            data.region || "ढूँढ रहे हैं...",
-            data.city || "ढूँढ रहे हैं...",
-            "स्थानीय क्षेत्र",
-            data.postal || "------"
-        );
-
-        document.getElementById("locationStatus").innerHTML = `<i class="fa-solid fa-network-wired"></i> नेटवर्क एक्टिव`;
-        document.getElementById("locationStatus").className = "live-location-badge success";
-        document.getElementById("directoryTitle").innerText = `आपातकालीन सेवाएं: ${data.city || 'आपके क्षेत्र'} के पास`;
-        
-        loadDirectory();
-    } catch (e) {
-        console.error("Network Fetch Failed", e);
-        // बैकअप में कोई भी नाम फिक्स न रखें, ताकि एरर आने पर यूज़र को भ्रम न हो
-        resetLocationUI("कनेक्शन एरर", "इंटरनेट धीमा है", "कृपया रिफ्रेश करें", "------");
-    }
-}
-
-// 🗺️ 2. fetchAddressFromCoords फंक्शन (लाइन 60 से शुरू होने वाला) को इससे बदलें:
-async function fetchAddressFromCoords(lat, lon) {
-    try {
-        // 🚀 फिक्स: यहाँ ${lat} और ${lon} का सही सिंटैक्स लिख दिया गया है
-        const response = await fetch(`https://openstreetmap.org{lat}&lon=${lon}&addressdetails=1&accept-language=hi`);
-        const data = await response.json();
-        
-        if (data.address) {
-            const addr = data.address;
-            const state = addr.state || "भारत का राज्य";
-            const district = addr.district || addr.county || addr.city || "आपका जिला";
-            const village = addr.village || addr.town || addr.suburb || addr.neighbourhood || "स्थानीय क्षेत्र";
-            const pincode = addr.postcode || "------";
-
-            resetLocationUI(state, district, village, pincode);
-            
-            document.getElementById("locationStatus").innerHTML = `<i class="fa-solid fa-circle-check"></i> GPS एक्टिव`;
-            document.getElementById("locationStatus").className = "live-location-badge success";
-            document.getElementById("directoryTitle").innerText = `आपातकालीन सेवाएं: ${village}, ${district} के लिए`;
-        }
-    } catch (error) {
-        console.error("Coords Fetch Failed", error);
-        fetchIPLocation();
-    }
-    loadDirectory();
-}
-
 
 function resetLocationUI(state, district, village, pin) {
     document.getElementById("stateName").innerText = state;
@@ -111,7 +74,9 @@ function loadDirectory() {
     listContainer.innerHTML = '';
 
     if (userLat) {
-        document.getElementById("nearestHub").innerHTML = `<i class="fa-solid fa-bolt"></i> लाइव ट्रैकर सक्रिय है।`;
+        document.getElementById("nearestHub").innerHTML = `<i class="fa-solid fa-bolt"></i> लाइव सैटेलाइट ट्रैकर सक्रिय है। नीचे बटनों का उपयोग करें।`;
+    } else {
+        document.getElementById("nearestHub").innerHTML = `<i class="fa-solid fa-circle-info"></i> कृपया ऊपर ब्राउज़र में लोकेशन अनुमति (Allow) दें।`;
     }
 
     const filtered = nationalHelplines.filter(item => {
@@ -136,11 +101,11 @@ function loadDirectory() {
         listContainer.appendChild(card);
     });
 
-    // 🚀 फिक्स: सिर्फ 4 महत्वपूर्ण मैप बटन्स जो बिल्कुल वर्कएबल हैं
+    // 🚀 अचूक डायनेमिक गूगल मैप्स पैरामीटर्स (यह नागपुर में नागपुर का और मऊ में मऊ का डेटा लाइव दिखाएगा)
     if (userLat) {
         const dynamicMapCards = document.createElement('div');
         dynamicMapCards.innerHTML = `
-            <h3 class="live-map-grid-title"><i class="fa-solid fa-location-arrow"></i> आपके वर्तमान स्थान के अनुसार लाइव सुविधाएं:</h3>
+            <h3 class="live-map-grid-title"><i class="fa-solid fa-location-arrow"></i> आपके स्थान के अनुसार लाइव सुविधाएं:</h3>
             <div class="map-grid-container">
                 <a href="https://google.com" target="_blank" class="map-link-btn" style="background:#0ea5e9;">
                     <i class="fa-solid fa-hospital"></i> नजदीकी अस्पताल खोजें
@@ -176,7 +141,7 @@ function filterByCategory(category) {
 }
 
 function triggerSOS() {
-    alert("SOS एक्टिवेटेड! राष्ट्रीय आपातकालीन सेवा 112 डायल की जा रही है।");
+    alert("SOS सक्रिय! राष्ट्रीय आपातकालीन सेवा 112 डायल की जा रही है।");
     window.location.href = "tel:112";
 }
 
